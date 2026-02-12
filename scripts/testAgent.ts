@@ -3,7 +3,7 @@ import { runAgent } from '../services/runAgent';
 
 async function main() {
     const question =
-        'Покажи конверсию из sign_up в purchase за последние 7 дней по странам';
+        'Что такое конверсия? Покажи конверсию из sign_up в purchase за последние 7 дней по странам';
 
     const result = await runAgent(question);
 

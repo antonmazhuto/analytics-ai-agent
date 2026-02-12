@@ -5,6 +5,7 @@ import {
     SUMMARIZER_USER_PROMPT_TEMPLATE,
 } from '../prompts/summarizeAnalyticsPrompt';
 import "dotenv/config";
+import {getMetricDocsForParsedQuery} from "./enrichParsedQueryWithDocs";
 
 const client = new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY,
@@ -15,11 +16,13 @@ function buildSummarizerPrompt(
     question: string,
     parsed: ParsedAnalyticsQuery,
     rows: any[],
+    docs: any[],
 ): string {
     return SUMMARIZER_USER_PROMPT_TEMPLATE
         .replace('{{question}}', question)
         .replace('{{parsed}}', JSON.stringify(parsed, null, 2))
-        .replace('{{rows}}', JSON.stringify(rows, null, 2));
+        .replace('{{rows}}', JSON.stringify(rows, null, 2))
+        .replace('{{docs}}', JSON.stringify(docs, null, 2));
 }
 
 export async function summarizeAnalytics(
@@ -27,7 +30,9 @@ export async function summarizeAnalytics(
     parsed: ParsedAnalyticsQuery,
     rows: any[],
 ): Promise<string> {
-    const prompt = buildSummarizerPrompt(question, parsed, rows);
+    const docs = await getMetricDocsForParsedQuery(parsed);
+
+    const prompt = buildSummarizerPrompt(question, parsed, rows, docs);
 
     const response = await client.chat.completions.create({
         model: 'gpt-4.1-mini',
