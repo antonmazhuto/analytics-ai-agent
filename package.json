@@ -1,0 +1,19 @@
+{
+  "name": "analytics-agent",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@types/pg": "^8.16.0",
+    "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "pg": "^8.18.0"
+  }
+}
