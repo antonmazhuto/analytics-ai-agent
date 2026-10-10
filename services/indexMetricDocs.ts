@@ -23,9 +23,14 @@ export async function indexMetricDocs(docs: MetricDocInput[]) {
 
     const vectors = resp.data.map(d => d.embedding);
 
+    // Upsert on metric_name so re-running the indexer refreshes rows instead of duplicating.
     const sql = `
     INSERT INTO metric_docs (metric_name, title, body, embedding)
-    VALUES ($1, $2, $3, $4)
+    VALUES ($1, $2, $3, $4::vector)
+    ON CONFLICT (metric_name)
+    DO UPDATE SET title = EXCLUDED.title,
+                  body = EXCLUDED.body,
+                  embedding = EXCLUDED.embedding
   `;
 
     for (let i = 0; i < docs.length; i++) {
@@ -33,7 +38,8 @@ export async function indexMetricDocs(docs: MetricDocInput[]) {
             docs[i].metric_name,
             docs[i].title,
             docs[i].body,
-            vectors[i], // double precision[]
+            // pgvector expects a text literal like '[0.1,0.2,...]', not a JS/PG array.
+            JSON.stringify(vectors[i]),
         ]);
     }
 }

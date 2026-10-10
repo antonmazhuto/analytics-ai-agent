@@ -1,19 +1,10 @@
 import OpenAI from 'openai';
 import { runSql } from '../db/runSql';
-import { cosineSimilarity } from './vectorMath';
 
 const client = new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY,
     baseURL: process.env.OPENROUTER_BASE_URL,
 });
-
-interface MetricDocRow {
-    id: number;
-    metric_name: string;
-    title: string;
-    body: string;
-    embedding: number[];
-}
 
 export interface RetrievedMetricDoc {
     id: number;
@@ -34,23 +25,17 @@ export async function retrieveMetricDocs(
 
     const queryEmbedding = embResp.data[0].embedding;
 
-    const rows = await runSql<MetricDocRow>(
-        'SELECT id, metric_name, title, body, embedding FROM metric_docs',
-        [],
+    // Vector search in Postgres via pgvector:
+    //   `<=>` is cosine DISTANCE; `1 - distance` gives cosine SIMILARITY (the score).
+    //   ORDER BY distance + LIMIT k uses the HNSW index — no full-table scan, no JS math.
+    const rows = await runSql<RetrievedMetricDoc>(
+        `SELECT id, metric_name, title, body,
+                1 - (embedding <=> $1::vector) AS score
+         FROM metric_docs
+         ORDER BY embedding <=> $1::vector
+         LIMIT $2`,
+        [JSON.stringify(queryEmbedding), k],
     );
 
-    const scored = rows.map(row => ({
-        ...row,
-        score: cosineSimilarity(queryEmbedding, row.embedding),
-    }));
-
-    scored.sort((a, b) => b.score - a.score);
-
-    return scored.slice(0, k).map(r => ({
-        id: r.id,
-        metric_name: r.metric_name,
-        title: r.title,
-        body: r.body,
-        score: r.score,
-    }));
+    return rows;
 }
