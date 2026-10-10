@@ -1,93 +1,134 @@
-import { SYSTEM_PROMPT, USER_PROMPT_TEMPLATE } from '../prompts/interpretQueryPrompt';
-import { ParsedAnalyticsQuery } from '../types/analytics';
-import OpenAI from 'openai';
-import "dotenv/config";
-import {validateParsedAnalyticsQuery} from "../validation/parsedAnalyticsValidator";
+import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
+import { RETRY_PROMPT_TEMPLATE, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE } from '../prompts/interpretQueryPrompt';
+import { fillTemplate } from '../prompts/fillTemplate';
+import { parsedAnalyticsQuerySchema } from '../schemas/parsedAnalyticsQuerySchema';
+import type { ParsedAnalyticsQuery } from '../types/analytics';
+import { validateParsedAnalyticsQuery } from '../validation/parsedAnalyticsValidator';
 import { buildSqlFromParsedQuery } from './buildSqlFromParsedQuery';
+import { chat as defaultChat, type ChatFn, type LlmChoice } from './llm';
 
-const client = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY,
-    baseURL: process.env.OPENROUTER_BASE_URL,
-});
+export type InterpretResult =
+    | { kind: 'query'; query: ParsedAnalyticsQuery }
+    | { kind: 'cannot_answer'; reason: string };
 
-function buildUserPrompt(question: string, validationErrors?: string): string {
-    const base = USER_PROMPT_TEMPLATE.replace('{{question}}', question);
+const TOOLS: ChatCompletionTool[] = [
+    {
+        type: 'function',
+        function: {
+            name: 'build_metric_query',
+            description: 'Describe the metric to compute. Code builds parameterized SQL from these arguments.',
+            // Same schema AJV enforces below; the model sees the rules, AJV is still the authority.
+            parameters: parsedAnalyticsQuerySchema,
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'cannot_answer',
+            description: 'Use when the question cannot be expressed with the supported metrics, events, columns or time range.',
+            parameters: {
+                type: 'object',
+                additionalProperties: false,
+                properties: { reason: { type: 'string' } },
+                required: ['reason'],
+            },
+        },
+    },
+];
 
-    if (!validationErrors) return base;
-
-    return `
-        ${base}
-        
-        Previous answer was invalid. Validation errors:
-        ${validationErrors}
-        
-        Please fix the JSON to strictly match the type. Return only JSON.
-    `;
-}
-
-function extractJson(content: string): string {
-    const jsonStart = content.indexOf('{');
-    const jsonEnd = content.lastIndexOf('}');
-    if (jsonStart === -1 || jsonEnd === -1) {
-        return content;
-    }
-    return content.slice(jsonStart, jsonEnd + 1);
-}
-
-async function callLLM(prompt: string) {
-    const response = await client.chat.completions.create({
-        model: 'gpt-4.1-mini',
-        messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: prompt },
-        ],
-        temperature: 0,
-        max_tokens: 100,
-    });
-
-    return response.choices[0]?.message?.content ?? '';
+export interface InterpretOptions {
+    chat?: ChatFn;
+    maxRetries?: number;
 }
 
 export async function interpretUserQuery(
     question: string,
-    maxRetries = 2,
-): Promise<ParsedAnalyticsQuery> {
-    let attempt = 0;
-    let lastError: unknown = null;
-    let validationErrorsText: string | undefined;
+    { chat = defaultChat, maxRetries = 2 }: InterpretOptions = {},
+): Promise<InterpretResult> {
+    const baseMessages: ChatCompletionMessageParam[] = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: fillTemplate(USER_PROMPT_TEMPLATE, { question }) },
+    ];
+    let retryPrompt: string | undefined;
+    let lastError = '';
 
-    while (attempt <= maxRetries) {
-        const prompt = buildUserPrompt(question, validationErrorsText);
-        const content = await callLLM(prompt);
-
-        let parsed: unknown;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        let output: string | undefined;
         try {
-            const jsonString = extractJson(content);
-            parsed = JSON.parse(jsonString);
+            const choice = await chat({
+                messages: retryPrompt ? [...baseMessages, { role: 'user', content: retryPrompt }] : baseMessages,
+                tools: TOOLS,
+                tool_choice: 'required',
+                temperature: 0,
+                max_tokens: 300,
+            });
+            output = describeOutput(choice);
+            return parseChoice(choice);
         } catch (e) {
-            lastError = new Error(`Failed to parse JSON from LLM: ${e}.\nRaw content: ${content}`);
-            validationErrorsText = String(lastError);
-            attempt += 1;
-            continue;
-        }
-
-        const validation = validateParsedAnalyticsQuery(parsed);
-        if (validation.ok) {
-            // Executability check: the builder is pure, so run it here and feed its error
-            // back to the model instead of failing later in the SQL step.
-            try {
-                buildSqlFromParsedQuery(validation.value);
-                return validation.value;
-            } catch (e) {
-                validationErrorsText = `Not executable: ${e instanceof Error ? e.message : String(e)}`;
+            lastError = errorMessage(e);
+            // Logged on every rejection: the rate of these is the degradation signal for this step.
+            console.warn(`[interpret] attempt ${attempt}/${maxRetries + 1} rejected: ${lastError}`);
+            // A network/provider error has no model output to correct: retry the same prompt.
+            if (output !== undefined) {
+                retryPrompt = fillTemplate(RETRY_PROMPT_TEMPLATE, { previousOutput: output, error: lastError });
             }
-        } else {
-            validationErrorsText = validation.errors;
         }
-
-        lastError = new Error(`Validation failed: ${validationErrorsText}. Raw: ${content}`);
-        attempt += 1;
     }
 
-    throw lastError ?? new Error('interpretUserQuery failed without specific error');
+    throw new Error(`interpretUserQuery failed after ${maxRetries + 1} attempts: ${lastError}`);
+}
+
+// Every way the model can break the contract ends up as a thrown Error whose message
+// is fed back to the model on the next attempt.
+function parseChoice(choice: LlmChoice): InterpretResult {
+    if (choice.finish_reason === 'length') {
+        throw new Error('Output was truncated (finish_reason=length)');
+    }
+
+    const call = choice.message.tool_calls?.[0]?.function;
+    if (!call) throw new Error('Expected a tool call, got none');
+
+    let args: unknown;
+    try {
+        args = JSON.parse(call.arguments);
+    } catch {
+        throw new Error('Tool arguments are not valid JSON');
+    }
+
+    if (call.name === 'cannot_answer') {
+        const reason = typeof args === 'object' && args !== null ? (args as { reason?: unknown }).reason : undefined;
+        if (typeof reason !== 'string' || reason.trim() === '') {
+            throw new Error('cannot_answer requires a non-empty "reason" string');
+        }
+        return { kind: 'cannot_answer', reason };
+    }
+
+    if (call.name !== 'build_metric_query') {
+        throw new Error(`Unknown tool: ${call.name}`);
+    }
+
+    const validation = validateParsedAnalyticsQuery(args);
+    if (!validation.ok) {
+        throw new Error(`Schema validation failed: ${validation.errors}`);
+    }
+
+    // Executability check: the builder is pure, so a query it would reject is caught here
+    // and corrected by the model, instead of failing later in the SQL step.
+    try {
+        buildSqlFromParsedQuery(validation.value);
+    } catch (e) {
+        throw new Error(`Not executable: ${errorMessage(e)}`);
+    }
+
+    return { kind: 'query', query: validation.value };
+}
+
+function describeOutput(choice: LlmChoice): string {
+    const call = choice.message.tool_calls?.[0]?.function;
+    const text = call ? `${call.name}(${call.arguments})` : choice.message.content || '(empty response)';
+    return text.slice(0, 1000);
+}
+
+function errorMessage(e: unknown): string {
+    return e instanceof Error ? e.message : String(e);
 }

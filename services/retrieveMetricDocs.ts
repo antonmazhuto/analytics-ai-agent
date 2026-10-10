@@ -1,10 +1,5 @@
-import OpenAI from 'openai';
 import { runSql } from '../db/runSql';
-
-const client = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY,
-    baseURL: process.env.OPENROUTER_BASE_URL,
-});
+import { EMBEDDING_MODEL, getOpenAI } from './llm';
 
 export interface RetrievedMetricDoc {
     id: number;
@@ -18,8 +13,8 @@ export async function retrieveMetricDocs(
     query: string,
     k = 5,
 ): Promise<RetrievedMetricDoc[]> {
-    const embResp = await client.embeddings.create({
-        model: 'text-embedding-3-small',
+    const embResp = await getOpenAI().embeddings.create({
+        model: EMBEDDING_MODEL,
         input: [query],
     });
 

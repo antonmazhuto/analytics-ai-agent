@@ -1,10 +1,11 @@
 import type { ParsedAnalyticsQuery } from '../types/analytics';
+import type { InterpretResult } from '../services/interpretUserQuery';
 import type { AnalyticsResult } from '../services/runAnalyticsQuery';
 import type { AgentStateUpdate, AgentStateValue } from './state';
 
 // Services are injected so the graph can be tested without an LLM or a database.
 export interface AgentDeps {
-    interpret: (question: string) => Promise<ParsedAnalyticsQuery>;
+    interpret: (question: string) => Promise<InterpretResult>;
     runQuery: (parsed: ParsedAnalyticsQuery) => Promise<AnalyticsResult>;
     summarize: (question: string, parsed: ParsedAnalyticsQuery, result: AnalyticsResult) => Promise<string>;
 }
@@ -17,7 +18,8 @@ export function createNodes(deps: AgentDeps) {
     return {
         async interpret(state: AgentStateValue): Promise<AgentStateUpdate> {
             try {
-                return { parsed: await deps.interpret(state.question) };
+                const result = await deps.interpret(state.question);
+                return result.kind === 'query' ? { parsed: result.query } : { refusal: result.reason };
             } catch (e) {
                 return { errors: [`interpret failed: ${errorMessage(e)}`] };
             }
@@ -44,6 +46,7 @@ export function createNodes(deps: AgentDeps) {
         // Terminal node for every failure path: the user gets an explicit "cannot answer"
         // instead of a summary built on top of a failed step.
         refuse(state: AgentStateValue): AgentStateUpdate {
+            if (state.refusal) return { answer: `Не могу ответить на этот вопрос: ${state.refusal}` };
             return { answer: `Не удалось ответить на вопрос: ${state.errors.join('; ')}` };
         },
     };

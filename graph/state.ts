@@ -8,6 +8,8 @@ export const AgentState = Annotation.Root({
     question: Annotation<string>,
     parsed: Annotation<ParsedAnalyticsQuery | undefined>,
     result: Annotation<AnalyticsResult | undefined>,
+    // Set when the model explicitly declined (cannot_answer) — a refusal, not an error.
+    refusal: Annotation<string | undefined>,
     answer: Annotation<string | undefined>,
     // Errors accumulate across nodes instead of overwriting each other.
     errors: Annotation<string[]>({

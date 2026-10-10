@@ -15,7 +15,7 @@ function deps(overrides: Partial<AgentDeps>, calls: string[]): AgentDeps {
     return {
         interpret: async () => {
             calls.push('interpret');
-            return parsed;
+            return { kind: 'query', query: parsed };
         },
         runQuery: async () => {
             calls.push('runQuery');
@@ -46,6 +46,17 @@ test('graph: interpret error routes to refusal and never touches SQL', async () 
 
     assert.deepEqual(calls, []);
     assert.match(final.answer ?? '', /Не удалось ответить.*model gave up/);
+});
+
+test('graph: cannot_answer routes to refusal with the model\'s reason', async () => {
+    const calls: string[] = [];
+    const final = await createAgentGraph(
+        deps({ interpret: async () => ({ kind: 'cannot_answer', reason: 'no revenue column' }) }, calls),
+    ).invoke({ question: 'q' });
+
+    assert.deepEqual(calls, []);
+    assert.equal(final.answer, 'Не могу ответить на этот вопрос: no revenue column');
+    assert.deepEqual(final.errors, []);
 });
 
 test('graph: SQL error routes to refusal and never calls the summarizer', async () => {
