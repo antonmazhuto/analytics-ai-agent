@@ -52,8 +52,8 @@ function checkGroupBy(groupBy: unknown): string[] {
 }
 
 // Order-aware funnel:
-//   1. cohort = users whose FIRST from_event falls in the window; the user is attributed
-//      to the country of that first from_event (one user = one row, no double counting);
+//   1. cohort = users with a from_event in the window, each taken once at their first such
+//      from_event and attributed to its country (one user = one row, no double counting);
 //   2. converted = a to_event exists strictly AFTER that first from_event.
 // A to_event before the from_event, or without one, does not count.
 function buildConversionRateSql(parsed: ParsedAnalyticsQuery, days: number, groupBy: string[]): SqlToolResult {

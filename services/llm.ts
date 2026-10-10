@@ -11,6 +11,7 @@ let client: OpenAI | undefined;
 // One client per process, created on first use so tests and DB-only scripts never need an API key
 // (the SDK constructor throws when no key is configured).
 export function getOpenAI(): OpenAI {
+    if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not set (see .env.example)');
     client ??= new OpenAI({
         apiKey: process.env.OPENROUTER_API_KEY,
         baseURL: process.env.OPENROUTER_BASE_URL,
