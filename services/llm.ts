@@ -2,9 +2,10 @@ import 'dotenv/config';
 import OpenAI from 'openai';
 import type { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 
-export const CHAT_MODEL = process.env.LLM_MODEL ?? 'gpt-4.1-mini';
+// OpenRouter model ids are provider-prefixed.
+export const CHAT_MODEL = process.env.LLM_MODEL ?? 'openai/gpt-4.1-mini';
 // Tied to vector(1536) in db/schema.sql: changing it means re-creating metric_docs.
-export const EMBEDDING_MODEL = 'text-embedding-3-small';
+export const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL ?? 'openai/text-embedding-3-small';
 
 let client: OpenAI | undefined;
 
