@@ -42,6 +42,6 @@ export async function indexMetricDocs(docs: MetricDocInput[]) {
             doc.body,
             // pgvector expects a text literal like '[0.1,0.2,...]', not a JS/PG array.
             JSON.stringify(vector),
-        ]);
+        ], 'owner');
     }
 }

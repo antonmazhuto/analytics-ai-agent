@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createAgentGraph } from '../graph/agentGraph';
-import { pool } from '../db/client';
+import { closePools } from '../db/client';
 import { interpretUserQuery } from '../services/interpretUserQuery';
 import { runAnalyticsQuery } from '../services/runAnalyticsQuery';
 import { summarizeAnalytics } from '../services/summarizeAnalytics';
@@ -33,4 +33,4 @@ main()
         console.error(err);
         process.exitCode = 1;
     })
-    .finally(() => pool.end());
+    .finally(closePools);

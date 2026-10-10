@@ -1,5 +1,6 @@
 import { runAnalyticsQuery } from '../services/runAnalyticsQuery';
 import { ParsedAnalyticsQuery } from '../types/analytics';
+import { closePools } from '../db/client';
 
 async function main() {
     const parsed: ParsedAnalyticsQuery = {
@@ -17,4 +18,9 @@ async function main() {
     console.log('Result:', JSON.stringify(result, null, 2));
 }
 
-main().catch(console.error);
+main()
+    .catch((err) => {
+        console.error(err);
+        process.exitCode = 1;
+    })
+    .finally(closePools);

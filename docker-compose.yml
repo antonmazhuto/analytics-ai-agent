@@ -1,5 +1,6 @@
 services:
   db:
+    # Postgres 16 with the pgvector extension preinstalled.
     image: pgvector/pgvector:pg16
     container_name: analytics-agent-db
     restart: unless-stopped
@@ -8,7 +9,8 @@ services:
       POSTGRES_PASSWORD: analytics
       POSTGRES_DB: analytics
     ports:
-      - "5432:5432"
+      # Localhost only. Override the host port with DB_PORT if 5432 is taken.
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

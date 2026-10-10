@@ -7,7 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "migrate": "tsx scripts/migrate.ts",
+    "migrate": "tsx scripts/applySql.ts db/schema.sql",
+    "seed": "tsx scripts/applySql.ts db/seed.sql",
     "index": "tsx scripts/indexMetricDocs.ts",
     "ask": "tsx scripts/ask.ts",
     "typecheck": "tsc --noEmit",

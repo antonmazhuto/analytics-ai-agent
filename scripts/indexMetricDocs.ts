@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { indexMetricDocs } from '../services/indexMetricDocs';
+import { closePools } from '../db/client';
 
 async function main() {
     await indexMetricDocs([
@@ -18,4 +19,9 @@ async function main() {
     console.log('Metric docs indexed');
 }
 
-main().catch(console.error);
+main()
+    .catch((err) => {
+        console.error(err);
+        process.exitCode = 1;
+    })
+    .finally(closePools);
