@@ -13,8 +13,8 @@ async function main() {
         group_by: ['country'],
     };
 
-    const rows = await runAnalyticsQuery(parsed);
-    console.log('Rows:', JSON.stringify(rows, null, 2));
+    const result = await runAnalyticsQuery(parsed);
+    console.log('Result:', JSON.stringify(result, null, 2));
 }
 
 main().catch(console.error);

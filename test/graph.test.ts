@@ -19,7 +19,7 @@ function deps(overrides: Partial<AgentDeps>, calls: string[]): AgentDeps {
         },
         runQuery: async () => {
             calls.push('runQuery');
-            return [{ event_count: 42 }];
+            return { rows: [{ event_count: 42 }], truncated: false };
         },
         summarize: async () => {
             calls.push('summarize');

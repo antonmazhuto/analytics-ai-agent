@@ -1,11 +1,12 @@
 import type { ParsedAnalyticsQuery } from '../types/analytics';
-import type { AgentStateUpdate, AgentStateValue, Row } from './state';
+import type { AnalyticsResult } from '../services/runAnalyticsQuery';
+import type { AgentStateUpdate, AgentStateValue } from './state';
 
 // Services are injected so the graph can be tested without an LLM or a database.
 export interface AgentDeps {
     interpret: (question: string) => Promise<ParsedAnalyticsQuery>;
-    runQuery: (parsed: ParsedAnalyticsQuery) => Promise<Row[]>;
-    summarize: (question: string, parsed: ParsedAnalyticsQuery, rows: Row[]) => Promise<string>;
+    runQuery: (parsed: ParsedAnalyticsQuery) => Promise<AnalyticsResult>;
+    summarize: (question: string, parsed: ParsedAnalyticsQuery, result: AnalyticsResult) => Promise<string>;
 }
 
 function errorMessage(e: unknown): string {
@@ -25,16 +26,16 @@ export function createNodes(deps: AgentDeps) {
         async sql(state: AgentStateValue): Promise<AgentStateUpdate> {
             if (!state.parsed) return { errors: ['sql: no parsed query'] };
             try {
-                return { rows: await deps.runQuery(state.parsed) };
+                return { result: await deps.runQuery(state.parsed) };
             } catch (e) {
                 return { errors: [`sql failed: ${errorMessage(e)}`] };
             }
         },
 
         async summarize(state: AgentStateValue): Promise<AgentStateUpdate> {
-            if (!state.parsed || !state.rows) return { errors: ['summarize: missing parsed query or rows'] };
+            if (!state.parsed || !state.result) return { errors: ['summarize: missing parsed query or result'] };
             try {
-                return { answer: await deps.summarize(state.question, state.parsed, state.rows) };
+                return { answer: await deps.summarize(state.question, state.parsed, state.result) };
             } catch (e) {
                 return { errors: [`summarize failed: ${errorMessage(e)}`] };
             }

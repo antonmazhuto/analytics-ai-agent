@@ -3,6 +3,7 @@ import { ParsedAnalyticsQuery } from '../types/analytics';
 import OpenAI from 'openai';
 import "dotenv/config";
 import {validateParsedAnalyticsQuery} from "../validation/parsedAnalyticsValidator";
+import { buildSqlFromParsedQuery } from './buildSqlFromParsedQuery';
 
 const client = new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY,
@@ -70,15 +71,20 @@ export async function interpretUserQuery(
             continue;
         }
 
-        const valid = validateParsedAnalyticsQuery(parsed);
-        if (valid) {
-            return parsed as ParsedAnalyticsQuery;
+        const validation = validateParsedAnalyticsQuery(parsed);
+        if (validation.ok) {
+            // Executability check: the builder is pure, so run it here and feed its error
+            // back to the model instead of failing later in the SQL step.
+            try {
+                buildSqlFromParsedQuery(validation.value);
+                return validation.value;
+            } catch (e) {
+                validationErrorsText = `Not executable: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        } else {
+            validationErrorsText = validation.errors;
         }
 
-        const errors = validateParsedAnalyticsQuery.errors ?? [];
-        validationErrorsText = errors
-            .map(err => `${err.instancePath} ${err.message}`)
-            .join('; ');
         lastError = new Error(`Validation failed: ${validationErrorsText}. Raw: ${content}`);
         attempt += 1;
     }

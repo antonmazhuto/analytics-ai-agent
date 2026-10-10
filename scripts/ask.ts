@@ -17,13 +17,13 @@ async function main() {
     const graph = createAgentGraph({
         interpret: (q) => interpretUserQuery(q),
         runQuery: runAnalyticsQuery,
-        summarize: summarizeAnalytics,
+        summarize: (q, parsed, result) => summarizeAnalytics(q, parsed, result.rows),
     });
 
     const finalState = await graph.invoke({ question });
 
     console.log('Parsed query:', JSON.stringify(finalState.parsed, null, 2));
-    console.log('Rows:', JSON.stringify(finalState.rows, null, 2));
+    console.log('Result:', JSON.stringify(finalState.result, null, 2));
     if (finalState.errors.length > 0) console.log('Errors:', finalState.errors);
     console.log('\nAnswer:\n' + finalState.answer);
 }
