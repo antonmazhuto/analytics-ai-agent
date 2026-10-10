@@ -1,22 +1,31 @@
 {
   "name": "analytics-agent",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "private": true,
-  "devDependencies": {
-    "@types/node": "^25.2.3",
-    "@types/pg": "^8.16.0",
-    "tsx": "^4.21.0"
+  "description": "Demo agent: natural-language product-analytics question -> validated tool call -> parameterized SQL on Postgres -> number-checked summary (LangGraph, OpenAI SDK, pgvector).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "migrate": "tsx scripts/applySql.ts db/schema.sql",
+    "seed": "tsx scripts/applySql.ts db/seed.sql",
+    "index": "tsx scripts/indexMetricDocs.ts",
+    "ask": "tsx scripts/ask.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.1.24",
     "@langchain/langgraph": "^1.1.4",
     "ajv": "^8.17.1",
-    "pg": "^8.18.0",
-    "zod": "^4.3.6"
+    "dotenv": "^17.4.2",
+    "openai": "^6.45.0",
+    "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@types/pg": "^8.16.0",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
   }
 }

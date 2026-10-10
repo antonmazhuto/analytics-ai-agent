@@ -1,5 +1,6 @@
 import { runAnalyticsQuery } from '../services/runAnalyticsQuery';
 import { ParsedAnalyticsQuery } from '../types/analytics';
+import { closePools } from '../db/client';
 
 async function main() {
     const parsed: ParsedAnalyticsQuery = {
@@ -13,8 +14,13 @@ async function main() {
         group_by: ['country'],
     };
 
-    const rows = await runAnalyticsQuery(parsed);
-    console.log('Rows:', JSON.stringify(rows, null, 2));
+    const result = await runAnalyticsQuery(parsed);
+    console.log('Result:', JSON.stringify(result, null, 2));
 }
 
-main().catch(console.error);
+main()
+    .catch((err) => {
+        console.error(err);
+        process.exitCode = 1;
+    })
+    .finally(closePools);
