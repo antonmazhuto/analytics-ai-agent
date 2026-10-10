@@ -11,6 +11,7 @@ export const AgentState = Annotation.Root({
     // Set when the model explicitly declined (cannot_answer) — a refusal, not an error.
     refusal: Annotation<string | undefined>,
     answer: Annotation<string | undefined>,
+    answerSource: Annotation<'llm' | 'template' | 'refusal' | undefined>,
     // Errors accumulate across nodes instead of overwriting each other.
     errors: Annotation<string[]>({
         reducer: (left, right) => left.concat(right),

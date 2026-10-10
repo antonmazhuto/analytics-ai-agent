@@ -1,13 +1,14 @@
 import type { ParsedAnalyticsQuery } from '../types/analytics';
 import type { InterpretResult } from '../services/interpretUserQuery';
 import type { AnalyticsResult } from '../services/runAnalyticsQuery';
+import type { SummaryResult } from '../services/summarizeAnalytics';
 import type { AgentStateUpdate, AgentStateValue } from './state';
 
 // Services are injected so the graph can be tested without an LLM or a database.
 export interface AgentDeps {
     interpret: (question: string) => Promise<InterpretResult>;
     runQuery: (parsed: ParsedAnalyticsQuery) => Promise<AnalyticsResult>;
-    summarize: (question: string, parsed: ParsedAnalyticsQuery, result: AnalyticsResult) => Promise<string>;
+    summarize: (question: string, parsed: ParsedAnalyticsQuery, result: AnalyticsResult) => Promise<SummaryResult>;
 }
 
 function errorMessage(e: unknown): string {
@@ -37,7 +38,8 @@ export function createNodes(deps: AgentDeps) {
         async summarize(state: AgentStateValue): Promise<AgentStateUpdate> {
             if (!state.parsed || !state.result) return { errors: ['summarize: missing parsed query or result'] };
             try {
-                return { answer: await deps.summarize(state.question, state.parsed, state.result) };
+                const summary = await deps.summarize(state.question, state.parsed, state.result);
+                return { answer: summary.answer, answerSource: summary.source };
             } catch (e) {
                 return { errors: [`summarize failed: ${errorMessage(e)}`] };
             }
@@ -46,8 +48,10 @@ export function createNodes(deps: AgentDeps) {
         // Terminal node for every failure path: the user gets an explicit "cannot answer"
         // instead of a summary built on top of a failed step.
         refuse(state: AgentStateValue): AgentStateUpdate {
-            if (state.refusal) return { answer: `Не могу ответить на этот вопрос: ${state.refusal}` };
-            return { answer: `Не удалось ответить на вопрос: ${state.errors.join('; ')}` };
+            const answer = state.refusal
+                ? `Не могу ответить на этот вопрос: ${state.refusal}`
+                : `Не удалось ответить на вопрос: ${state.errors.join('; ')}`;
+            return { answer, answerSource: 'refusal' };
         },
     };
 }

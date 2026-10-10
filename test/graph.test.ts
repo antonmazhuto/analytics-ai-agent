@@ -23,7 +23,7 @@ function deps(overrides: Partial<AgentDeps>, calls: string[]): AgentDeps {
         },
         summarize: async () => {
             calls.push('summarize');
-            return 'Покупок: 42';
+            return { answer: 'Покупок: 42', source: 'llm' };
         },
         ...overrides,
     };

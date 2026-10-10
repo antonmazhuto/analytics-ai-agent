@@ -1,12 +1,7 @@
-import { ParsedAnalyticsQuery } from '../types/analytics';
-import { retrieveMetricDocs } from './retrieveMetricDocs';
+import type { ParsedAnalyticsQuery } from '../types/analytics';
+import { retrieveMetricDocs, type RetrievedMetricDoc } from './retrieveMetricDocs';
 
-export async function getMetricDocsForParsedQuery(
-    parsed: ParsedAnalyticsQuery,
-) {
-    const queryText = `metric: ${parsed.metric}, group_by: ${parsed.group_by.join(
-        ', ',
-    )}`;
-    const docs = await retrieveMetricDocs(queryText, 3);
-    return docs;
+export async function getMetricDocsForParsedQuery(parsed: ParsedAnalyticsQuery): Promise<RetrievedMetricDoc[]> {
+    const queryText = `metric: ${parsed.metric}, group_by: ${parsed.group_by.join(', ')}`;
+    return retrieveMetricDocs(queryText, 3);
 }

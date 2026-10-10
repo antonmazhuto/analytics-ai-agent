@@ -17,7 +17,7 @@ async function main() {
     const graph = createAgentGraph({
         interpret: (q) => interpretUserQuery(q),
         runQuery: runAnalyticsQuery,
-        summarize: (q, parsed, result) => summarizeAnalytics(q, parsed, result.rows),
+        summarize: (q, parsed, result) => summarizeAnalytics(q, parsed, result),
     });
 
     const finalState = await graph.invoke({ question });
@@ -25,7 +25,7 @@ async function main() {
     console.log('Parsed query:', JSON.stringify(finalState.parsed, null, 2));
     console.log('Result:', JSON.stringify(finalState.result, null, 2));
     if (finalState.errors.length > 0) console.log('Errors:', finalState.errors);
-    console.log('\nAnswer:\n' + finalState.answer);
+    console.log(`\nAnswer (${finalState.answerSource}):\n${finalState.answer}`);
 }
 
 main()
