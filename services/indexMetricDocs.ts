@@ -33,13 +33,15 @@ export async function indexMetricDocs(docs: MetricDocInput[]) {
                   embedding = EXCLUDED.embedding
   `;
 
-    for (let i = 0; i < docs.length; i++) {
+    for (const [i, doc] of docs.entries()) {
+        const vector = vectors[i];
+        if (!vector) throw new Error(`No embedding returned for ${doc.metric_name}`);
         await runSql(sql, [
-            docs[i].metric_name,
-            docs[i].title,
-            docs[i].body,
+            doc.metric_name,
+            doc.title,
+            doc.body,
             // pgvector expects a text literal like '[0.1,0.2,...]', not a JS/PG array.
-            JSON.stringify(vectors[i]),
+            JSON.stringify(vector),
         ]);
     }
 }

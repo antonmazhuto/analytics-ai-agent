@@ -1,34 +1,24 @@
 import { StateGraph, START, END } from '@langchain/langgraph';
-import type { AgentState } from './state';
-import { interpretNode, sqlNode, summarizeNode } from './nodes';
+import { AgentState, type AgentStateValue } from './state';
+import { createNodes, type AgentDeps } from './nodes';
 
-const builder = new StateGraph<AgentState>({
-    channels: {
-        question: {
-            initial: (state?: AgentState) => state?.question ?? '',
-        },
-        parsed: {
-            initial: (state?: AgentState) => state?.parsed ?? undefined,
-        },
-        rows: {
-            initial: (state?: AgentState) => state?.rows ?? undefined,
-        },
-        answer: {
-            initial: (state?: AgentState) => state?.answer ?? undefined,
-        },
-        errors: {
-            initial: (state?: AgentState) => state?.errors ?? [],
-        },
-    },
-});
+// Any error recorded so far short-circuits to the refusal node.
+function nextOrRefuse<T extends string>(next: T) {
+    return (state: AgentStateValue): T | 'refuse' => (state.errors.length > 0 ? 'refuse' : next);
+}
 
-builder.addNode('interpret', interpretNode);
-builder.addNode('sql', sqlNode);
-builder.addNode('summarize', summarizeNode);
+export function createAgentGraph(deps: AgentDeps) {
+    const nodes = createNodes(deps);
 
-builder.addEdge(START, 'interpret');
-builder.addEdge('interpret', 'sql');
-builder.addEdge('sql', 'summarize');
-builder.addEdge('summarize', END);
-
-export const graph = builder.compile();
+    return new StateGraph(AgentState)
+        .addNode('interpret', nodes.interpret)
+        .addNode('sql', nodes.sql)
+        .addNode('summarize', nodes.summarize)
+        .addNode('refuse', nodes.refuse)
+        .addEdge(START, 'interpret')
+        .addConditionalEdges('interpret', nextOrRefuse('sql'), ['sql', 'refuse'])
+        .addConditionalEdges('sql', nextOrRefuse('summarize'), ['summarize', 'refuse'])
+        .addConditionalEdges('summarize', nextOrRefuse(END), [END, 'refuse'])
+        .addEdge('refuse', END)
+        .compile();
+}

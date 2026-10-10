@@ -23,7 +23,8 @@ export async function retrieveMetricDocs(
         input: [query],
     });
 
-    const queryEmbedding = embResp.data[0].embedding;
+    const queryEmbedding = embResp.data[0]?.embedding;
+    if (!queryEmbedding) throw new Error('Embedding API returned no data');
 
     // Vector search in Postgres via pgvector:
     //   `<=>` is cosine DISTANCE; `1 - distance` gives cosine SIMILARITY (the score).

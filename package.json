@@ -9,7 +9,9 @@
   "scripts": {
     "migrate": "tsx scripts/migrate.ts",
     "index": "tsx scripts/indexMetricDocs.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "ask": "tsx scripts/ask.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.1.24",
